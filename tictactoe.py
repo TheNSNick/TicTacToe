@@ -1,209 +1,176 @@
-import pygame, sys
+import pygame, sys, constants, TTT, random
 from pygame.locals import *
-# dimensions
-global SCREEN_HEIGHT, SCREEN_WIDTH, TILE_SIZE, LINE_WIDTH, BORDER, FPS
-SCREEN_HEIGHT = SCREEN_WIDTH = 600
-TILE_SIZE = SCREEN_HEIGHT/3
-LINE_WIDTH = 5
-BORDER = 10
-FPS = 30
-# colors
-global BG_COLOR, LINE_COLOR, X_COLOR, O_COLOR
-BG_COLOR = (100, 100, 100)
-LINE_COLOR = (0, 0, 0)
-X_COLOR = (0, 0, 200)
-O_COLOR = (200, 0, 0)# game variables
-global  X_MOVES, O_MOVES, GAME_MODE, X_TURN, WINNER, WIN_LINE
-X_MOVES = []
-O_MOVES = []
-GAME_MODE = 'INTRO'
-X_TURN = True
-WINNER = '-'
-WIN_LINE = None
 
 def main():
-    global X_MOVES, O_MOVES, GAME_MODE, X_TURN, WINNER, WIN_LINE
-    global DISPLAY_SURF, FPS_CLOCK, GAME_MODE
+    # pygame inits
+    global DISPLAY_SURF, FPS_CLOCK
     pygame.init()
-    DISPLAY_SURF = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    DISPLAY_SURF = pygame.display.set_mode((constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT))
     pygame.display.set_caption('TIC TAC TOE')
     FPS_CLOCK = pygame.time.Clock()
-    GAME_MODE = 'INTRO'
+    # game variables
+    game_mode = 'INTRO'
+    board = new_board()
+    num_players = 1
+    current_player = 'X'
+    win_line_points = None
+    # Intro 'screen'
+    intro_surface = pygame.Surface((3*constants.SCREEN_WIDTH/4, constants.SCREEN_HEIGHT/2))
+    intro_surface.fill(constants.INTRO_BG_COLOR)
+    intro_font_large = pygame.font.SysFont(None, 36)
+    intro_font_small = pygame.font.SysFont(None, 24)
+    intro_text_1 = intro_font_large.render('Tic Tac Toe', True, constants.INTRO_TEXT_COLOR, constants.INTRO_BG_COLOR)
+    intro_text_1_rect = intro_text_1.get_rect()
+    intro_text_1_rect.midtop = (intro_surface.get_width()/2, constants.BORDER)
+    intro_text_2 = intro_font_small.render('Press 1 for 1P or 2 for 2P.', True, constants.INTRO_TEXT_COLOR, constants.INTRO_BG_COLOR)
+    intro_text_2_rect = intro_text_2.get_rect()
+    intro_text_2_rect.midtop = (intro_surface.get_width()/2, intro_text_1_rect.bottom + constants.BORDER)
+    intro_surface.blit(intro_text_1, intro_text_1_rect)
+    intro_surface.blit(intro_text_2, intro_text_2_rect)
     while True:
+        if num_players == 1 and current_player == 'O':
+            ai_move_row, ai_move_col = TTT.ideal_move(board, 'O')
+            pygame.time.wait(constants.AI_MOVE_TIME)
+            if board[ai_move_row][ai_move_col] == '-':
+                board[ai_move_row][ai_move_col] = 'O'
+                win_squares = TTT.tic_tac_toe(board)
+                if win_squares is not None:
+                    game_mode = 'WIN'
+                    win_line_points = set_win_line(win_squares)
+                else:
+                    current_player = change_player(current_player)
+            elif ai_move_col == -1 and ai_move_row == -1:
+                game_mode = 'TIE'
+            else:
+                raise SystemError('Invalid AI move. row,col: '+str(ai_move_row)+str(ai_move_col))
         for event in pygame.event.get():
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit()
-            elif event.type == MOUSEBUTTONDOWN and GAME_MODE == 'PLAY':
-                move = screenXYtoTile(event.pos[0], event.pos[1])
-                if move not in X_MOVES and move not in O_MOVES:
-                    if X_TURN:
-                        X_MOVES.append(move)
+            elif event.type == MOUSEBUTTONDOWN and game_mode == 'PLAY':
+                tile_x, tile_y = screen_xy_to_tile_xy(event.pos[0], event.pos[1])
+                if board[tile_y][tile_x] == '-':
+                    board[tile_y][tile_x] = current_player
+                    win_squares = TTT.tic_tac_toe(board)
+                    if win_squares is not None:
+                        game_mode = 'WIN'
+                        win_line_points = set_win_line(win_squares)
                     else:
-                        O_MOVES.append(move)
-                    WINNER, WIN_LINE = ticTacToe(X_MOVES, O_MOVES)
-                    if WINNER == '-':
-                        X_TURN = not X_TURN
-                    else:
-                        GAME_MODE = 'WIN'
+                        current_player = change_player(current_player)
             elif event.type == KEYDOWN:
                 # TO DO: ACTUAL INTRO TRANSITION
-                if event.key == K_RETURN and GAME_MODE == 'INTRO':
-                    GAME_MODE = 'PLAY'
-        DISPLAY_SURF.fill(BG_COLOR)
-        if GAME_MODE is not 'INTRO':
-            drawLines(DISPLAY_SURF)
-            drawXs(DISPLAY_SURF, X_MOVES)
-            drawOs(DISPLAY_SURF, O_MOVES)
-        if GAME_MODE == 'WIN':
-            drawWinLine(DISPLAY_SURF, WINNER, WIN_LINE)
+                if (event.key == K_1 or event.key == K_KP1) and game_mode == 'INTRO':
+                    num_players = 1
+                    game_mode = 'PLAY'
+                elif (event.key == K_2 or event.key == K_KP2) and game_mode == 'INTRO':
+                    num_players = 2
+                    game_mode = 'PLAY'
+                if (event.key == K_RETURN or event.key == K_KP_ENTER) and (game_mode == 'WIN' or game_mode == 'TIE'):
+                    board = new_board()
+                    current_player = 'X'
+                    game_mode = 'INTRO'
+        DISPLAY_SURF.fill(constants.BG_COLOR)
+        if game_mode == 'INTRO':
+            intro_surface_rect = intro_surface.get_rect()
+            intro_surface_rect.center = DISPLAY_SURF.get_rect().center
+            DISPLAY_SURF.blit(intro_surface, intro_surface_rect)
+        else:
+            draw_lines(DISPLAY_SURF)
+            draw_xs(DISPLAY_SURF, board)
+            draw_os(DISPLAY_SURF, board)
+        if game_mode == 'WIN':
+            pygame.draw.line(DISPLAY_SURF, constants.LINE_COLOR, win_line_points[0], win_line_points[1], 2*constants.LINE_WIDTH)
+        if game_mode == 'TIE':
+            pass
+            # TO DO : TIE SCREEN
         pygame.display.update()
-        FPS_CLOCK.tick(FPS)
+        FPS_CLOCK.tick(constants.FPS)
 
-def drawLines(display):
+
+def new_board():
+    return [['-', '-', '-'], ['-', '-', '-'], ['-', '-', '-']]
+
+
+def screen_xy_to_tile_xy(x, y):
+    if x < constants.TILE_SIZE:
+        tile_x = 0
+    elif x < 2 * constants.TILE_SIZE:
+        tile_x = 1
+    else:
+        tile_x = 2
+    if y < constants.TILE_SIZE:
+        tile_y = 0
+    elif y < 2 * constants.TILE_SIZE:
+        tile_y = 1
+    else:
+        tile_y = 2
+    return (tile_x, tile_y)
+
+
+def change_player(player):
+    if player == 'X':
+        return 'O'
+    elif player == 'O':
+        return 'X'
+    else:
+        raise NameError('change_player(): Invalid player given.')
+
+
+def draw_lines(display):
     for i in range(1, 3):
-        pygame.draw.line(display, LINE_COLOR, (i*TILE_SIZE, BORDER), (i*TILE_SIZE, SCREEN_HEIGHT-BORDER), LINE_WIDTH)
-        pygame.draw.line(display, LINE_COLOR, (BORDER, i*TILE_SIZE), (SCREEN_WIDTH-BORDER, i*TILE_SIZE), LINE_WIDTH)
+        pygame.draw.line(display, constants.LINE_COLOR, (i*constants.TILE_SIZE, constants.BORDER), (i*constants.TILE_SIZE, constants.SCREEN_HEIGHT-constants.BORDER), constants.LINE_WIDTH)
+        pygame.draw.line(display, constants.LINE_COLOR, (constants.BORDER, i*constants.TILE_SIZE), (constants.SCREEN_WIDTH-constants.BORDER, i*constants.TILE_SIZE), constants.LINE_WIDTH)
 
-def drawXs(display, Xs):
-    for x in Xs:
-        if x[0] == 'A':
-            left_x = BORDER
-            right_x = TILE_SIZE-BORDER
-        elif x[0] == 'B':
-            left_x = TILE_SIZE + BORDER
-            right_x = 2 * TILE_SIZE - BORDER
-        elif x[0] == 'C':
-            left_x = 2 * TILE_SIZE + BORDER
-            right_x = SCREEN_WIDTH - BORDER
-        if x[1] == '1':
-            top_y = BORDER
-            bottom_y = TILE_SIZE - BORDER
-        elif x[1] == '2':
-            top_y = TILE_SIZE + BORDER
-            bottom_y = 2 * TILE_SIZE - BORDER
-        elif x[1] == '3':
-            top_y = 2 * TILE_SIZE + BORDER
-            bottom_y = SCREEN_HEIGHT - BORDER
-        pygame.draw.line(display, X_COLOR, (left_x, top_y), (right_x, bottom_y), LINE_WIDTH)
-        pygame.draw.line(display, X_COLOR, (left_x, bottom_y), (right_x, top_y), LINE_WIDTH)
 
-def drawOs(display, Os):
-    for o in Os:
-        if o[0] == 'A':
-            center_x = TILE_SIZE / 2
-        if o[0] == 'B':
-            center_x = 3 * TILE_SIZE / 2
-        if o[0] == 'C':
-            center_x = 5 * TILE_SIZE / 2
-        if o[1] == '1':
-            center_y = TILE_SIZE / 2
-        if o[1] == '2':
-            center_y = 3 * TILE_SIZE / 2
-        if o[1] == '3':
-            center_y = 5 * TILE_SIZE / 2
-        pygame.draw.circle(display, O_COLOR, (center_x, center_y), TILE_SIZE/2-BORDER, LINE_WIDTH)
+def draw_xs(display, board):
+    left_xs = [k * constants.TILE_SIZE + constants.BORDER for k in range(3)]
+    right_xs = [(k + 1) * constants.TILE_SIZE - constants.BORDER for k in range(3)]
+    top_ys = [k * constants.TILE_SIZE + constants.BORDER for k in range(3)]
+    bottom_ys = [(k + 1) * constants.TILE_SIZE - constants.BORDER for k in range(3)]
+    for i in range(3):
+        for j in range(3):
+            if board[j][i] == 'X':
+                pygame.draw.line(display, constants.X_COLOR, (left_xs[i], top_ys[j]), (right_xs[i], bottom_ys[j]), constants.LINE_WIDTH)
+                pygame.draw.line(display, constants.X_COLOR, (right_xs[i], top_ys[j]), (left_xs[i], bottom_ys[j]), constants.LINE_WIDTH)
 
-def drawWinLine(display, winner, line):
-    if winner == 'X':
-        line_color = X_COLOR
-    elif winner == 'O':
-        line_color = O_COLOR
-    if line == 'HT':
-        begin = (BORDER, TILE_SIZE/2)
-        end = (SCREEN_WIDTH-BORDER, TILE_SIZE/2)
-    elif line == 'HM':
-        begin = (BORDER, 3*TILE_SIZE/2)
-        end = (SCREEN_WIDTH-BORDER, 3*TILE_SIZE/2)
-    elif line == 'HB':
-        begin = (BORDER, 5*TILE_SIZE/2)
-        end = (SCREEN_WIDTH-BORDER, 5*TILE_SIZE/2)
-    elif line == 'VL':
-        begin = (TILE_SIZE/2, BORDER)
-        end = (TILE_SIZE/2, SCREEN_HEIGHT-BORDER)
-    elif line == 'VM':
-        begin = (3*TILE_SIZE/2, BORDER)
-        end = (3*TILE_SIZE/2, SCREEN_HEIGHT-BORDER)
-    elif line == 'VR':
-        begin = (5*TILE_SIZE/2, BORDER)
-        end = (5*TILE_SIZE/2, SCREEN_HEIGHT-BORDER)
-    elif line == 'DD':
-        begin = (TILE_SIZE/4, TILE_SIZE/4)
-        end = (11*TILE_SIZE/4, 11*TILE_SIZE/4)
-    elif line == 'DU':
-        begin = (TILE_SIZE/4, 11*TILE_SIZE/4)
-        end = (11*TILE_SIZE/4, TILE_SIZE/4)
-    pygame.draw.line(display, line_color, begin, end, LINE_WIDTH*2)
 
-def screenXYtoTile(x, y):
-    tile = ''
-    if x < TILE_SIZE:
-        tile += 'A'
-    elif x < 2 * TILE_SIZE:
-        tile += 'B'
+def draw_os(display, board):
+    center_xs = [(2*k + 1) * constants.TILE_SIZE / 2 for k in range(3)]
+    center_ys = [(2*k + 1) * constants.TILE_SIZE / 2 for k in range(3)]
+    for i in range(3):
+        for j in range(3):
+            if board[j][i] == 'O':
+                pygame.draw.circle(display, constants.O_COLOR, (center_xs[i], center_ys[j]), constants.TILE_SIZE/2-constants.BORDER, constants.LINE_WIDTH)
+
+
+def set_win_line(win_squares):
+    if win_squares[0][0] == win_squares[1][0]:
+        # horizontal line
+        x_1 = random.randint(constants.BORDER, constants.TILE_SIZE/4)
+        x_2 = random.randint(10*constants.TILE_SIZE/4, constants.SCREEN_WIDTH-constants.BORDER)
+        y_1 = random.randint((2*win_squares[0][0]+1)*constants.TILE_SIZE/2-constants.SLANT_FACTOR, (2*win_squares[0][0]+1)*constants.TILE_SIZE/2+constants.SLANT_FACTOR)
+        y_2 = random.randint((2*win_squares[0][0]+1)*constants.TILE_SIZE/2-constants.SLANT_FACTOR, (2*win_squares[0][0]+1)*constants.TILE_SIZE/2+constants.SLANT_FACTOR)
+    elif win_squares[0][1] == win_squares[1][1]:
+        # vertical line
+        x_1 = random.randint((2*win_squares[0][1]+1)*constants.TILE_SIZE/2-constants.SLANT_FACTOR, (2*win_squares[0][1]+1)*constants.TILE_SIZE/2+constants.SLANT_FACTOR)
+        x_2 = random.randint((2*win_squares[0][1]+1)*constants.TILE_SIZE/2-constants.SLANT_FACTOR, (2*win_squares[0][1]+1)*constants.TILE_SIZE/2+constants.SLANT_FACTOR)
+        y_1 = random.randint(constants.BORDER, constants.TILE_SIZE/4)
+        y_2 = random.randint(10*constants.TILE_SIZE/4, constants.SCREEN_HEIGHT-constants.BORDER)
+    elif (0, 0) in win_squares:
+        # diagonal down
+        x_1 = random.randint(constants.BORDER, constants.TILE_SIZE/4)
+        x_2 = random.randint(10*constants.TILE_SIZE/4, constants.SCREEN_WIDTH-constants.BORDER)
+        y_1 = random.randint(constants.BORDER, constants.TILE_SIZE/4)
+        y_2 = random.randint(10*constants.TILE_SIZE/4, constants.SCREEN_WIDTH-constants.BORDER)
+    elif (0, 2) in win_squares:
+        # diagonal up
+        x_1 = random.randint(constants.BORDER, constants.TILE_SIZE/4)
+        x_2 = random.randint(10*constants.TILE_SIZE/4, constants.SCREEN_WIDTH-constants.BORDER)
+        y_1 = random.randint(10*constants.TILE_SIZE/4, constants.SCREEN_WIDTH-constants.BORDER)
+        y_2 = random.randint(constants.BORDER, constants.TILE_SIZE/4)
     else:
-        tile += 'C'
-    if y < TILE_SIZE:
-        tile += '1'
-    elif y < 2 * TILE_SIZE:
-        tile += '2'
-    else:
-        tile += '3'
-    return tile
-
-def ticTacToe(x, o):
-    """Returns WINNER, LINE"""
-    winner = '-'
-    line = None
-    if 'A1' in x and 'A2' in x and 'A3' in x:
-        winner = 'X'
-        line = 'VL'
-    elif 'B1' in x and 'B2' in x and 'B3' in x:
-        winner = 'X'
-        line = 'VM'
-    elif 'C1' in x and 'C2' in x and 'C3' in x:
-        winner = 'X'
-        line = 'VR'
-    elif 'A1' in x and 'B1' in x and 'C1' in x:
-        winner = 'X'
-        line = 'HT'
-    elif 'A2' in x and 'B2' in x and 'C2' in x:
-        winner = 'X'
-        line = 'HM'
-    elif 'A3' in x and 'B3' in x and 'C3' in x:
-        winner = 'X'
-        line = 'HB'
-    elif 'A1' in x and 'B2' in x and 'C3' in x:
-        winner = 'X'
-        line = 'DD'
-    elif 'A3' in x and 'B2' in x and 'C1' in x:
-        winner = 'X'
-        line = 'DU'
-    if 'A1' in o and 'A2' in o and 'A3' in o:
-        winner = 'O'
-        line = 'VL'
-    elif 'B1' in o and 'B2' in o and 'B3' in o:
-        winner = 'O'
-        line = 'VM'
-    elif 'C1' in o and 'C2' in o and 'C3' in o:
-        winner = 'O'
-        line = 'VR'
-    elif 'A1' in o and 'B1' in o and 'C1' in o:
-        winner = 'O'
-        line = 'HT'
-    elif 'A2' in o and 'B2' in o and 'C2' in o:
-        winner = 'O'
-        line = 'HM'
-    elif 'A3' in o and 'B3' in o and 'C3' in o:
-        winner = 'O'
-        line = 'HB'
-    elif 'A1' in o and 'B2' in o and 'C3' in o:
-        winner = 'O'
-        line = 'DD'
-    elif 'A3' in o and 'B2' in o and 'C1' in o:
-        winner = 'O'
-        line = 'DU'
-    return winner, line
+        raise SystemError('draw_win_line(): Could not find winning line.')
+    return (x_1, y_1), (x_2, y_2)
 
 if __name__ == '__main__':
     main()
