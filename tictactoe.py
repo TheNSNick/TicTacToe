@@ -1,4 +1,4 @@
-import pygame, sys, constants, TTT, random
+import pygame, sys, constants, random
 from pygame.locals import *
 
 def main():
@@ -28,12 +28,12 @@ def main():
     intro_surface.blit(intro_text_1, intro_text_1_rect)
     intro_surface.blit(intro_text_2, intro_text_2_rect)
     while True:
-        if num_players == 1 and current_player == 'O':
-            ai_move_row, ai_move_col = TTT.ideal_move(board, 'O')
+        if num_players == 1 and current_player == 'O' and game_mode == 'PLAY':
+            ai_move_row, ai_move_col = ideal_move(board, 'O')
             pygame.time.wait(constants.AI_MOVE_TIME)
             if board[ai_move_row][ai_move_col] == '-':
                 board[ai_move_row][ai_move_col] = 'O'
-                win_squares = TTT.tic_tac_toe(board)
+                win_squares = tic_tac_toe(board)
                 if win_squares is not None:
                     game_mode = 'WIN'
                     win_line_points = set_win_line(win_squares)
@@ -51,7 +51,7 @@ def main():
                 tile_x, tile_y = screen_xy_to_tile_xy(event.pos[0], event.pos[1])
                 if board[tile_y][tile_x] == '-':
                     board[tile_y][tile_x] = current_player
-                    win_squares = TTT.tic_tac_toe(board)
+                    win_squares = tic_tac_toe(board)
                     if win_squares is not None:
                         game_mode = 'WIN'
                         win_line_points = set_win_line(win_squares)
@@ -79,7 +79,7 @@ def main():
             draw_xs(DISPLAY_SURF, board)
             draw_os(DISPLAY_SURF, board)
         if game_mode == 'WIN':
-            pygame.draw.line(DISPLAY_SURF, constants.LINE_COLOR, win_line_points[0], win_line_points[1], 2*constants.LINE_WIDTH)
+            pygame.draw.line(DISPLAY_SURF, constants.LINE_COLOR, win_line_points[0], win_line_points[1], constants.WIN_WIDTH)
         if game_mode == 'TIE':
             pass
             # TO DO : TIE SCREEN
@@ -130,8 +130,8 @@ def draw_xs(display, board):
     for i in range(3):
         for j in range(3):
             if board[j][i] == 'X':
-                pygame.draw.line(display, constants.X_COLOR, (left_xs[i], top_ys[j]), (right_xs[i], bottom_ys[j]), constants.LINE_WIDTH)
-                pygame.draw.line(display, constants.X_COLOR, (right_xs[i], top_ys[j]), (left_xs[i], bottom_ys[j]), constants.LINE_WIDTH)
+                pygame.draw.line(display, constants.X_COLOR, (left_xs[i], top_ys[j]), (right_xs[i], bottom_ys[j]), constants.X_WIDTH)
+                pygame.draw.line(display, constants.X_COLOR, (right_xs[i], top_ys[j]), (left_xs[i], bottom_ys[j]), constants.X_WIDTH)
 
 
 def draw_os(display, board):
@@ -140,7 +140,7 @@ def draw_os(display, board):
     for i in range(3):
         for j in range(3):
             if board[j][i] == 'O':
-                pygame.draw.circle(display, constants.O_COLOR, (center_xs[i], center_ys[j]), constants.TILE_SIZE/2-constants.BORDER, constants.LINE_WIDTH)
+                pygame.draw.circle(display, constants.O_COLOR, (center_xs[i], center_ys[j]), constants.TILE_SIZE/2-constants.BORDER, constants.O_WIDTH)
 
 
 def set_win_line(win_squares):
@@ -171,6 +171,139 @@ def set_win_line(win_squares):
     else:
         raise SystemError('draw_win_line(): Could not find winning line.')
     return (x_1, y_1), (x_2, y_2)
+
+
+def tic_tac_toe(board):
+    """Returns the squares of a tic-tac-toe or None if none exists."""
+    for i in range(3):
+        row = board[i]
+        if row[0] != '-' and row[0] == row[1] and row[0] == row[2]:
+            return [(i, j) for j in range(3)]
+        col = [board[j][i] for j in range(3)]
+        if col[0] != '-' and col[0] == col[1] and col[0] == col[2]:
+            return [(j, i) for j in range(3)]
+    diag_ups = [board[j][2-j] for j in range(3)]
+    if diag_ups[0] != '-' and diag_ups[0] == diag_ups[1] and diag_ups[0] == diag_ups[2]:
+        return [(j, 2-j) for j in range(3)]
+    diag_downs = [board[j][j] for j in range(3)]
+    if diag_downs[0] != '-' and diag_downs[0] == diag_downs[1] and diag_downs[0] == diag_downs[2]:
+        return [(j, j) for j in range(3)]
+    return None
+
+
+def winning_moves(board, player):
+    moves = []
+    for i in range(3):
+        r_count = 0
+        r_move = None
+        for r in board[i]:
+            if r == player:
+                r_count += 1
+            elif r == '-':
+                r_move = board[i].index(r)
+            else:
+                r_move = None
+                break
+        if r_move is not None and r_count == 2:
+            if (i, r_move) not in moves:
+                moves.append((i, r_move))
+        c_count = 0
+        c_move = None
+        c_list = [board[0][i], board[1][i], board[2][i]]
+        for c in c_list:
+            if c == player:
+                c_count += 1
+            elif c == '-':
+                c_move = c_list.index(c)
+            else:
+                c_move = None
+                break
+        if c_move is not None and c_count == 2:
+            if (c_move, i) not in moves:
+                moves.append((c_move, i))
+        diag_down_count = 0
+        diag_down_move = None
+        diag_down_list = [board[0][0], board[1][1], board[2][2]]
+        for dd in diag_down_list:
+            if dd == player:
+                diag_down_count += 1
+            elif dd == '-':
+                diag_down_move = diag_down_list.index(dd)
+            else:
+                diag_down_move = None
+                break
+        if diag_down_move is not None and diag_down_count == 2:
+            if (diag_down_move, diag_down_move) not in moves:
+                moves.append((diag_down_move, diag_down_move))
+        diag_up_count = 0
+        diag_up_move = None
+        diag_up_list = [board[0][2], board[1][1], board[2][0]]
+        for du in diag_up_list:
+            if du == player:
+                diag_up_count += 1
+            elif du == '-':
+                diag_up_move = diag_up_list.index(du)
+            else:
+                diag_up_move = None
+                break
+        if diag_up_move is not None and diag_up_count == 2:
+            if (diag_up_move, 2-diag_up_move) not in moves:
+                moves.append((diag_up_move, 2-diag_up_move))
+    return moves
+
+
+def forking_moves(board, player):
+    moves = []
+    for row in range(3):
+        for col in range(3):
+            move_sq = (row, col)
+            if board[row][col] == '-':
+                board[row][col] = player
+                if len(winning_moves(board, player)) >= 2 and move_sq not in moves:
+                    moves.append(move_sq)
+                board[row][col] = '-'
+    return moves
+
+def ideal_move(board, player):
+    if player == 'X':
+        enemy = 'O'
+    elif player == 'O':
+        enemy = 'X'
+    else:
+        raise NameError('ideal_move(): Invalid player given.')
+    # check for win
+    wins = winning_moves(board, player)
+    if len(wins) > 0:
+        return wins[0]
+    # check for block
+    enemy_wins = winning_moves(board, enemy)
+    if len(enemy_wins) > 0:
+        return enemy_wins[0]
+    # check for fork
+    forks = forking_moves(board, player)
+    if len(forks) > 0:
+        return forks[0]
+    # check for fork-block
+    enemy_forks = forking_moves(board, enemy)
+    if len(enemy_forks) > 0:
+        return enemy_forks[0]
+    # check for empty center
+    if board[1][1] == '-':
+        return (1, 1)
+    # opposite corner
+    for corner in [(0, 0), (0, 2), (2, 0), (2, 2)]:
+        if board[corner[0]][corner[1]] == '-' and board[2-corner[0]][2-corner[1]] == player:
+            return (corner[0], corner[1])
+    # empty corner
+    for corner in [(0, 0), (0, 2), (2, 0), (2, 2)]:
+        if board[corner[0]][corner[1]] == '-':
+            return (corner[0], corner[1])
+    # side
+    for side in [(0, 1), (1, 0), (1, 2), (2, 1)]:
+        if board[side[0]][side[1]] == '-':
+            return (side[0], side[1])
+    # no spaces left
+    return (-1, -1)
 
 if __name__ == '__main__':
     main()
