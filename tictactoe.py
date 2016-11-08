@@ -1,36 +1,45 @@
-import pygame, sys, constants, random
+import pygame, sys, random
 from pygame.locals import *
+
+# CONSTANTS
+# scalars
+SCREEN_HEIGHT = SCREEN_WIDTH = 600
+TILE_SIZE = SCREEN_HEIGHT / 3
+LINE_WIDTH = 5
+X_WIDTH = 10
+O_WIDTH = 10
+WIN_WIDTH = 25
+BORDER = 10
+FPS = 30
+SLANT_FACTOR = 45  # how 'wobbly' the win line is
+AI_MOVE_TIME = 750
+# colors
+BG_COLOR = (100, 100, 100)
+INTRO_BG_COLOR = (200, 200, 200)
+INTRO_TEXT_COLOR = (166, 166, 0)
+LINE_COLOR = (0, 0, 0)
+X_COLOR = (0, 0, 200)
+O_COLOR = (200, 0, 0)
 
 def main():
     # pygame inits
-    global DISPLAY_SURF, FPS_CLOCK
     pygame.init()
-    DISPLAY_SURF = pygame.display.set_mode((constants.SCREEN_WIDTH, constants.SCREEN_HEIGHT))
+    DISPLAY_SURF = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption('TIC TAC TOE')
-    FPS_CLOCK = pygame.time.Clock()
+    fps_clock = pygame.time.Clock()
     # game variables
     game_mode = 'INTRO'
     board = new_board()
     num_players = 1
     current_player = 'X'
     win_line_points = None
-    # Intro 'screen'
-    intro_surface = pygame.Surface((3*constants.SCREEN_WIDTH/4, constants.SCREEN_HEIGHT/2))
-    intro_surface.fill(constants.INTRO_BG_COLOR)
-    intro_font_large = pygame.font.SysFont(None, 36)
-    intro_font_small = pygame.font.SysFont(None, 24)
-    intro_text_1 = intro_font_large.render('Tic Tac Toe', True, constants.INTRO_TEXT_COLOR, constants.INTRO_BG_COLOR)
-    intro_text_1_rect = intro_text_1.get_rect()
-    intro_text_1_rect.midtop = (intro_surface.get_width()/2, constants.BORDER)
-    intro_text_2 = intro_font_small.render('Press 1 for 1P or 2 for 2P.', True, constants.INTRO_TEXT_COLOR, constants.INTRO_BG_COLOR)
-    intro_text_2_rect = intro_text_2.get_rect()
-    intro_text_2_rect.midtop = (intro_surface.get_width()/2, intro_text_1_rect.bottom + constants.BORDER)
-    intro_surface.blit(intro_text_1, intro_text_1_rect)
-    intro_surface.blit(intro_text_2, intro_text_2_rect)
+    intro_1 = create_intro_1()
+    # main game loop
     while True:
+        # (wait, then) AI move if applicable
         if num_players == 1 and current_player == 'O' and game_mode == 'PLAY':
             ai_move_row, ai_move_col = ideal_move(board, 'O')
-            pygame.time.wait(constants.AI_MOVE_TIME)
+            pygame.time.wait(AI_MOVE_TIME)
             if board[ai_move_row][ai_move_col] == '-':
                 board[ai_move_row][ai_move_col] = 'O'
                 win_squares = tic_tac_toe(board)
@@ -43,10 +52,13 @@ def main():
                 game_mode = 'TIE'
             else:
                 raise SystemError('Invalid AI move. row,col: '+str(ai_move_row)+str(ai_move_col))
+        # event handling
         for event in pygame.event.get():
+            # exit
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit()
+            # player move
             elif event.type == MOUSEBUTTONDOWN and game_mode == 'PLAY':
                 tile_x, tile_y = screen_xy_to_tile_xy(event.pos[0], event.pos[1])
                 if board[tile_y][tile_x] == '-':
@@ -57,6 +69,7 @@ def main():
                         win_line_points = set_win_line(win_squares)
                     else:
                         current_player = change_player(current_player)
+            # game mode transitions
             elif event.type == KEYDOWN:
                 # TO DO: ACTUAL INTRO TRANSITION
                 if (event.key == K_1 or event.key == K_KP1) and game_mode == 'INTRO':
@@ -69,22 +82,23 @@ def main():
                     board = new_board()
                     current_player = 'X'
                     game_mode = 'INTRO'
-        DISPLAY_SURF.fill(constants.BG_COLOR)
+        # drawing and updating surface
+        DISPLAY_SURF.fill(BG_COLOR)
         if game_mode == 'INTRO':
-            intro_surface_rect = intro_surface.get_rect()
-            intro_surface_rect.center = DISPLAY_SURF.get_rect().center
-            DISPLAY_SURF.blit(intro_surface, intro_surface_rect)
+            intro_1_rect = intro_1.get_rect()
+            intro_1_rect.center = DISPLAY_SURF.get_rect().center
+            DISPLAY_SURF.blit(intro_1, intro_1_rect)
         else:
             draw_lines(DISPLAY_SURF)
             draw_xs(DISPLAY_SURF, board)
             draw_os(DISPLAY_SURF, board)
         if game_mode == 'WIN':
-            pygame.draw.line(DISPLAY_SURF, constants.LINE_COLOR, win_line_points[0], win_line_points[1], constants.WIN_WIDTH)
+            pygame.draw.line(DISPLAY_SURF, LINE_COLOR, win_line_points[0], win_line_points[1], WIN_WIDTH)
         if game_mode == 'TIE':
             pass
             # TO DO : TIE SCREEN
         pygame.display.update()
-        FPS_CLOCK.tick(constants.FPS)
+        fps_clock.tick(FPS)
 
 
 def new_board():
@@ -92,19 +106,21 @@ def new_board():
 
 
 def screen_xy_to_tile_xy(x, y):
-    if x < constants.TILE_SIZE:
+    """Takes on-screen coordinates and returns tile coordinates.
+    """
+    if x < TILE_SIZE:
         tile_x = 0
-    elif x < 2 * constants.TILE_SIZE:
+    elif x < 2 * TILE_SIZE:
         tile_x = 1
     else:
         tile_x = 2
-    if y < constants.TILE_SIZE:
+    if y < TILE_SIZE:
         tile_y = 0
-    elif y < 2 * constants.TILE_SIZE:
+    elif y < 2 * TILE_SIZE:
         tile_y = 1
     else:
         tile_y = 2
-    return (tile_x, tile_y)
+    return tile_x, tile_y
 
 
 def change_player(player):
@@ -116,65 +132,82 @@ def change_player(player):
         raise NameError('change_player(): Invalid player given.')
 
 
+def create_intro_1():
+    intro_surface = pygame.Surface((3 * SCREEN_WIDTH / 4, SCREEN_HEIGHT / 2))
+    intro_surface.fill(INTRO_BG_COLOR)
+    intro_font_large = pygame.font.SysFont(None, 36)
+    intro_font_small = pygame.font.SysFont(None, 24)
+    intro_text_1 = intro_font_large.render('Tic Tac Toe', True, INTRO_TEXT_COLOR, INTRO_BG_COLOR)
+    intro_text_1_rect = intro_text_1.get_rect()
+    intro_text_1_rect.midtop = (intro_surface.get_width() / 2, BORDER)
+    intro_text_2 = intro_font_small.render('Press 1 for 1P or 2 for 2P.', True, INTRO_TEXT_COLOR, INTRO_BG_COLOR)
+    intro_text_2_rect = intro_text_2.get_rect()
+    intro_text_2_rect.midtop = (intro_surface.get_width() / 2, intro_text_1_rect.bottom + BORDER)
+    intro_surface.blit(intro_text_1, intro_text_1_rect)
+    intro_surface.blit(intro_text_2, intro_text_2_rect)
+    return intro_surface
+
+
 def draw_lines(display):
     for i in range(1, 3):
-        pygame.draw.line(display, constants.LINE_COLOR, (i*constants.TILE_SIZE, constants.BORDER), (i*constants.TILE_SIZE, constants.SCREEN_HEIGHT-constants.BORDER), constants.LINE_WIDTH)
-        pygame.draw.line(display, constants.LINE_COLOR, (constants.BORDER, i*constants.TILE_SIZE), (constants.SCREEN_WIDTH-constants.BORDER, i*constants.TILE_SIZE), constants.LINE_WIDTH)
+        pygame.draw.line(display, LINE_COLOR, (i*TILE_SIZE, BORDER), (i*TILE_SIZE, SCREEN_HEIGHT-BORDER), LINE_WIDTH)
+        pygame.draw.line(display, LINE_COLOR, (BORDER, i*TILE_SIZE), (SCREEN_WIDTH-BORDER, i*TILE_SIZE), LINE_WIDTH)
 
 
 def draw_xs(display, board):
-    left_xs = [k * constants.TILE_SIZE + constants.BORDER for k in range(3)]
-    right_xs = [(k + 1) * constants.TILE_SIZE - constants.BORDER for k in range(3)]
-    top_ys = [k * constants.TILE_SIZE + constants.BORDER for k in range(3)]
-    bottom_ys = [(k + 1) * constants.TILE_SIZE - constants.BORDER for k in range(3)]
+    left_xs = [k * TILE_SIZE + BORDER for k in range(3)]
+    right_xs = [(k + 1) * TILE_SIZE - BORDER for k in range(3)]
+    top_ys = [k * TILE_SIZE + BORDER for k in range(3)]
+    bottom_ys = [(k + 1) * TILE_SIZE - BORDER for k in range(3)]
     for i in range(3):
         for j in range(3):
             if board[j][i] == 'X':
-                pygame.draw.line(display, constants.X_COLOR, (left_xs[i], top_ys[j]), (right_xs[i], bottom_ys[j]), constants.X_WIDTH)
-                pygame.draw.line(display, constants.X_COLOR, (right_xs[i], top_ys[j]), (left_xs[i], bottom_ys[j]), constants.X_WIDTH)
+                pygame.draw.line(display, X_COLOR, (left_xs[i], top_ys[j]), (right_xs[i], bottom_ys[j]), X_WIDTH)
+                pygame.draw.line(display, X_COLOR, (right_xs[i], top_ys[j]), (left_xs[i], bottom_ys[j]), X_WIDTH)
 
 
 def draw_os(display, board):
-    center_xs = [(2*k + 1) * constants.TILE_SIZE / 2 for k in range(3)]
-    center_ys = [(2*k + 1) * constants.TILE_SIZE / 2 for k in range(3)]
+    center_xs = [(2*k + 1) * TILE_SIZE / 2 for k in range(3)]
+    center_ys = [(2*k + 1) * TILE_SIZE / 2 for k in range(3)]
     for i in range(3):
         for j in range(3):
             if board[j][i] == 'O':
-                pygame.draw.circle(display, constants.O_COLOR, (center_xs[i], center_ys[j]), constants.TILE_SIZE/2-constants.BORDER, constants.O_WIDTH)
+                pygame.draw.circle(display, O_COLOR, (center_xs[i], center_ys[j]), TILE_SIZE/2-BORDER, O_WIDTH)
 
 
 def set_win_line(win_squares):
     if win_squares[0][0] == win_squares[1][0]:
         # horizontal line
-        x_1 = random.randint(constants.BORDER, constants.TILE_SIZE/4)
-        x_2 = random.randint(10*constants.TILE_SIZE/4, constants.SCREEN_WIDTH-constants.BORDER)
-        y_1 = random.randint((2*win_squares[0][0]+1)*constants.TILE_SIZE/2-constants.SLANT_FACTOR, (2*win_squares[0][0]+1)*constants.TILE_SIZE/2+constants.SLANT_FACTOR)
-        y_2 = random.randint((2*win_squares[0][0]+1)*constants.TILE_SIZE/2-constants.SLANT_FACTOR, (2*win_squares[0][0]+1)*constants.TILE_SIZE/2+constants.SLANT_FACTOR)
+        x_1 = random.randint(BORDER, TILE_SIZE/4)
+        x_2 = random.randint(10*TILE_SIZE/4, SCREEN_WIDTH-BORDER)
+        y_1 = random.randint((2*win_squares[0][0]+1)*TILE_SIZE/2-SLANT_FACTOR, (2*win_squares[0][0]+1)*TILE_SIZE/2+SLANT_FACTOR)
+        y_2 = random.randint((2*win_squares[0][0]+1)*TILE_SIZE/2-SLANT_FACTOR, (2*win_squares[0][0]+1)*TILE_SIZE/2+SLANT_FACTOR)
     elif win_squares[0][1] == win_squares[1][1]:
         # vertical line
-        x_1 = random.randint((2*win_squares[0][1]+1)*constants.TILE_SIZE/2-constants.SLANT_FACTOR, (2*win_squares[0][1]+1)*constants.TILE_SIZE/2+constants.SLANT_FACTOR)
-        x_2 = random.randint((2*win_squares[0][1]+1)*constants.TILE_SIZE/2-constants.SLANT_FACTOR, (2*win_squares[0][1]+1)*constants.TILE_SIZE/2+constants.SLANT_FACTOR)
-        y_1 = random.randint(constants.BORDER, constants.TILE_SIZE/4)
-        y_2 = random.randint(10*constants.TILE_SIZE/4, constants.SCREEN_HEIGHT-constants.BORDER)
+        x_1 = random.randint((2*win_squares[0][1]+1)*TILE_SIZE/2-SLANT_FACTOR, (2*win_squares[0][1]+1)*TILE_SIZE/2+SLANT_FACTOR)
+        x_2 = random.randint((2*win_squares[0][1]+1)*TILE_SIZE/2-SLANT_FACTOR, (2*win_squares[0][1]+1)*TILE_SIZE/2+SLANT_FACTOR)
+        y_1 = random.randint(BORDER, TILE_SIZE/4)
+        y_2 = random.randint(10*TILE_SIZE/4, SCREEN_HEIGHT-BORDER)
     elif (0, 0) in win_squares:
         # diagonal down
-        x_1 = random.randint(constants.BORDER, constants.TILE_SIZE/4)
-        x_2 = random.randint(10*constants.TILE_SIZE/4, constants.SCREEN_WIDTH-constants.BORDER)
-        y_1 = random.randint(constants.BORDER, constants.TILE_SIZE/4)
-        y_2 = random.randint(10*constants.TILE_SIZE/4, constants.SCREEN_WIDTH-constants.BORDER)
+        x_1 = random.randint(BORDER, TILE_SIZE/4)
+        x_2 = random.randint(10*TILE_SIZE/4, SCREEN_WIDTH-BORDER)
+        y_1 = random.randint(BORDER, TILE_SIZE/4)
+        y_2 = random.randint(10*TILE_SIZE/4, SCREEN_WIDTH-BORDER)
     elif (0, 2) in win_squares:
         # diagonal up
-        x_1 = random.randint(constants.BORDER, constants.TILE_SIZE/4)
-        x_2 = random.randint(10*constants.TILE_SIZE/4, constants.SCREEN_WIDTH-constants.BORDER)
-        y_1 = random.randint(10*constants.TILE_SIZE/4, constants.SCREEN_WIDTH-constants.BORDER)
-        y_2 = random.randint(constants.BORDER, constants.TILE_SIZE/4)
+        x_1 = random.randint(BORDER, TILE_SIZE/4)
+        x_2 = random.randint(10*TILE_SIZE/4, SCREEN_WIDTH-BORDER)
+        y_1 = random.randint(10*TILE_SIZE/4, SCREEN_WIDTH-BORDER)
+        y_2 = random.randint(BORDER, TILE_SIZE/4)
     else:
         raise SystemError('draw_win_line(): Could not find winning line.')
     return (x_1, y_1), (x_2, y_2)
 
 
 def tic_tac_toe(board):
-    """Returns the squares of a tic-tac-toe or None if none exists."""
+    """Returns the squares of a tic-tac-toe or None if none exists.
+    """
     for i in range(3):
         row = board[i]
         if row[0] != '-' and row[0] == row[1] and row[0] == row[2]:
@@ -192,6 +225,8 @@ def tic_tac_toe(board):
 
 
 def winning_moves(board, player):
+    """Given the board and player, returns all winning squares.
+    """
     moves = []
     for i in range(3):
         r_count = 0
@@ -253,6 +288,8 @@ def winning_moves(board, player):
 
 
 def forking_moves(board, player):
+    """Given a board and player, returns all forking moves.
+    """
     moves = []
     for row in range(3):
         for col in range(3):
@@ -265,6 +302,8 @@ def forking_moves(board, player):
     return moves
 
 def ideal_move(board, player):
+    """Given a board and player, returns the ideal move to make.
+    """
     if player == 'X':
         enemy = 'O'
     elif player == 'O':
@@ -281,18 +320,22 @@ def ideal_move(board, player):
         return enemy_wins[0]
     # check for fork
     forks = forking_moves(board, player)
-    if len(forks) > 0:
+    if len(forks) > 1:
         return forks[0]
     # check for fork-block
     enemy_forks = forking_moves(board, enemy)
-    if len(enemy_forks) > 0:
+    if len(enemy_forks) > 1:
+        for side in [(0, 1), (1, 0), (1, 2), (2, 1)]:
+            if board[side[0]][side[1]] == '-':
+                return side
+    elif len(enemy_forks) == 1:
         return enemy_forks[0]
     # check for empty center
     if board[1][1] == '-':
         return (1, 1)
     # opposite corner
     for corner in [(0, 0), (0, 2), (2, 0), (2, 2)]:
-        if board[corner[0]][corner[1]] == '-' and board[2-corner[0]][2-corner[1]] == player:
+        if board[corner[0]][corner[1]] == '-' and board[2-corner[0]][2-corner[1]] == enemy:
             return (corner[0], corner[1])
     # empty corner
     for corner in [(0, 0), (0, 2), (2, 0), (2, 2)]:
